@@ -1,5 +1,5 @@
 # openalex-ror-predictor
-Minor tweaking of @jpbarrett13's [OpenAlex institution ID prediction service](https://github.com/ourresearch/openalex-institution-parsing/tree/main/V1/003_Deploy/model_to_api) to spit out ROR IDs.
+Minor tweaking of [jpbarrett13](https://github.com/jpbarrett13)'s [OpenAlex institution ID prediction service](https://github.com/ourresearch/openalex-institution-parsing/tree/main/V1/003_Deploy/model_to_api) to spit out ROR IDs.
 
 #overview
 The team at OpenAlex trained a text classification model on their affiliation strings to predict institution IDs. By adding a mapping between OpenAlex institution IDs and ROR IDs, the same model can be used to predict ROR IDs. See OpenAlex's [paper](https://docs.google.com/document/d/1ppbKRVtyneWc7Hjpo8TOm57YLGx1C2Oo/) and [jpbarrett13](https://github.com/jpbarrett13)'s [notebooks](https://github.com/ourresearch/openalex-institution-parsing/tree/main/V1) for full details.
