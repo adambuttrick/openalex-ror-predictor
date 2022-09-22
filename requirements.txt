@@ -1,0 +1,9 @@
+numpy
+flask
+requests
+tensorflow==2.8.0
+transformers==4.18.0
+protobuf==3.20.*
+langdetect
+unidecode
+pandas
