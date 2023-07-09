@@ -1,9 +1,9 @@
 import requests
 
 
-def query(affilitation_strig):
+def query(affiliation_strig):
 	url = 'http://127.0.0.1:5000/invocations'
-	test_data ={'affiliation_string':[affilitation_strig]}
+	test_data ={'affiliation_string':[affiliation_strig]}
 	response = requests.post(url, json = test_data)
 	return response
 
