@@ -3,7 +3,7 @@
 Downloads, extracts, and processes OpenAlex institution data, creating a CSV file and a pickle file mapping OpenAlex IDs to ROR IDs.
 
 ## Requirements
-- AWS CLI
+- [AWS CLI](https://aws.amazon.com/cli/)
 
 ## Installation
 
