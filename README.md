@@ -9,12 +9,12 @@ This code uses the v2 version of OpenAlex's institutional classification models 
    ```
    pip install -r requirements.txt
    ```
-3. Download the OpenAlex v2 model artifacts as described in the [notes](https://github.com/ourresearch/openalex-institution-parsing/tree/main/V2) section of the OpenAlex institution parsing repo.
+2. Download the OpenAlex v2 model artifacts as described in the [notes](https://github.com/ourresearch/openalex-institution-parsing/tree/main/V2) section of the OpenAlex institution parsing repo.
+   ```
+   aws s3 cp s3://openalex-institution-tagger-model-artifacts/ . --recursive
+   ```
 
-`aws s3 cp s3://openalex-institution-tagger-model-artifacts/ . --recursive
-`
-
-4. Run the `download_and_parse_openalex_institutions.py` script to create the OpenAlex institution ROR ID mapping pkl file and place this inside the `institution_tagger_v2_artifacts` directory. This requires you have the AWS command line tool installed. Additional details are provided in the repo for the download script.
+3. Run the `download_and_parse_openalex_institutions.py` script to create the OpenAlex institution ROR ID mapping pkl file and place this inside the `institution_tagger_v2_artifacts` directory. This requires you have the AWS command line tool installed. Additional details are provided in the [repo for the download script](https://github.com/adambuttrick/openalex-ror-predictor/tree/main/utils/download_and_parse_openalex_institutions).
 
 ## Usage
 There are two main scripts:
