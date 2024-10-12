@@ -5,14 +5,18 @@ import argparse
 from collections import defaultdict
 
 
+def process_ror_ids(ror_id_string):
+    return set(id.strip() for id in ror_id_string.split(';') if id.strip())
+
+
 def load_results_set(f):
     with open(f, 'r+', encoding='utf-8-sig') as f_in:
         reader = csv.DictReader(f_in)
         results_set = []
         for row in reader:
             processed_row = {
-                'ror_id': row['ror_id'].strip(),
-                'predicted_ror_ids': [id.strip() for id in row['predicted_ror_id'].split(';') if id.strip()],
+                'ror_id': process_ror_ids(row['ror_id']),
+                'predicted_ror_ids': process_ror_ids(row['predicted_ror_id']),
                 'prediction_scores': [float(score) for score in row['prediction_scores'].split(';') if score.strip()]
             }
             processed_row['confusion_matrix'] = calculate_confusion_matrix(
@@ -22,21 +26,21 @@ def load_results_set(f):
 
 
 def calculate_confusion_matrix(row):
-    true_ror_id = row['ror_id']
-    predictions = row['predicted_ror_ids']
-    
-    if not true_ror_id:
-        if not predictions:
-            return {'TN': 1, 'FP': 0, 'TP': 0, 'FN': 0}
+    true_ids = row['ror_id']
+    pred_ids = row['predicted_ror_ids']
+    TP, FP, TN, FN = 0, 0, 0, 0
+    if len(true_ids) == 0:
+        if len(pred_ids) == 0:
+            TN = 1
         else:
-            return {'TN': 0, 'FP': len(predictions), 'TP': 0, 'FN': 0}
-    elif not predictions:
-        return {'TN': 0, 'FP': 0, 'TP': 0, 'FN': 1}
+            FP = len(pred_ids)
+    elif len(pred_ids) == 0:
+        FN = len(true_ids)
     else:
-        if true_ror_id in predictions:
-            return {'TN': 0, 'FP': len(predictions) - 1, 'TP': 1, 'FN': 0}
-        else:
-            return {'TN': 0, 'FP': len(predictions), 'TP': 0, 'FN': 0}
+        TP = sum(1 for x in pred_ids if x in true_ids)
+        FP = sum(1 for x in pred_ids if x not in true_ids)
+        FN = sum(1 for x in true_ids if x not in pred_ids)
+    return {'TP': TP, 'FP': FP, 'TN': TN, 'FN': FN}
 
 
 def calculate_counts(results_set):
@@ -56,7 +60,6 @@ def calculate_metrics(counts):
     false_pos = counts['FP']
     false_neg = counts['FN']
     true_neg = counts['TN']
-
     precision = safe_div(true_pos, true_pos + false_pos)
     recall = safe_div(true_pos, true_pos + false_neg)
     f1_score = safe_div(2 * precision * recall, precision + recall)
@@ -83,6 +86,9 @@ def write_results_with_classification(input_file, output_file, results_set):
         writer.writeheader()
         for row, result in zip(reader, results_set):
             row.update(result['confusion_matrix'])
+            row['ror_id'] = ';'.join(sorted(result['ror_id']))
+            row['predicted_ror_id'] = ';'.join(
+                sorted(result['predicted_ror_ids']))
             writer.writerow(row)
 
 
