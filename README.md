@@ -38,10 +38,10 @@ To use the `InstitutionTagger` class in your Python code:
 from institution_tagger import InstitutionTagger
 
 tagger = InstitutionTagger(model_path="institution_tagger_v2_artifacts")
-predictions_df = tagger.predict(your_dataframe)
-```
+affiliation_strings = ['University of Michigan, Ann Arbor, USA', 'Getty Conservation Institute, Los Angeles']
+predictions = tagger.predict(affiliation_strings)
 
-The input dataframe should likewise have an 'affiliation_string' column. The output will include columns for predicted institution IDs, ROR IDs, prediction scores, and prediction categories.
+```
 
 ## Output
 The predictor returns the following for each affiliation string:
