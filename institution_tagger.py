@@ -5,15 +5,33 @@ import pickle
 from unidecode import unidecode
 from collections import Counter
 from langdetect import detect
-import pandas as pd
 import numpy as np
 import tensorflow as tf
 from transformers import TFAutoModelForSequenceClassification, DistilBertTokenizer
 from transformers import DataCollatorWithPadding, PreTrainedTokenizerFast
 
 
+class AffiliationRecord:
+    def __init__(self, affiliation_string):
+        self.affiliation_string = affiliation_string
+        self.lang = None
+        self.country_in_string = None
+        self.comma_split_len = None
+        self.institution_id = None
+        self.decoded_text = None
+        self.lang_pred_score = None
+        self.basic_pred_score = None
+        self.ror_id = None
+        self.score = None
+        self.category = None
+
+
 class InstitutionTagger:
     def __init__(self, model_path="institution_tagger_v2_artifacts"):
+        self._load_data(model_path)
+        self._initialize_models(model_path)
+
+    def _load_data(self, model_path):
         with open(os.path.join(model_path, "departments_list.pkl"), "rb") as f:
             self.departments_list = pickle.load(f)
 
@@ -41,6 +59,7 @@ class InstitutionTagger:
         with open(os.path.join(model_path, "institutions.pkl"), "rb") as f:
             self.institution_ror_mapping = pickle.load(f)
 
+    def _initialize_models(self, model_path):
         self.language_tokenizer = DistilBertTokenizer.from_pretrained(
             "distilbert-base-uncased", return_tensors='tf')
         self.data_collator = DataCollatorWithPadding(
@@ -62,6 +81,9 @@ class InstitutionTagger:
         return self.institution_ror_mapping.get(institution_id, None)
 
     def _string_match_clean(self, text):
+        if not isinstance(text, str):
+            return ""
+
         # Replace "&" with "and"
         if "r&d" not in text.lower():
             text = text.replace(" & ", " and ")
@@ -524,81 +546,56 @@ class InstitutionTagger:
             true_final_cats = ['nothing']
         return [true_final_preds, true_final_scores, true_final_cats]
 
-    def predict(self, df, lang_thresh=0.9, basic_thresh=0.9):
-        df['lang'] = df['affiliation_string'].apply(self._get_language)
-        df['country_in_string'] = df['affiliation_string'].apply(
-            self._get_country_in_string)
-        df['comma_split_len'] = df['affiliation_string'].apply(
-            lambda x: len([i if i else "" for i in x.split(",")])
-        )
+    def _format_results(self):
+        results = []
+        for record in self.affiliations:
+            result = {
+                'affiliation_string': record.affiliation_string,
+                'institution_id': ';'.join(str(id) for id in record.institution_id) if record.institution_id else '',
+                'score': ';'.join(str(score) for score in record.score) if record.score else '',
+                'category': ';'.join(str(cat) for cat in record.category) if record.category else '',
+                'ror_id': ';'.join(str(ror) for ror in record.ror_id) if record.ror_id else ''
+            }
+            results.append(result)
+        return results
 
-        df['institution_id'] = df.apply(
-            lambda x: self._get_initial_pred(
-                x.affiliation_string, x.lang, x.country_in_string, x.comma_split_len
-            ),
-            axis=1,
-        )
+    def predict(self, affiliation_strings, lang_thresh=0.9, basic_thresh=0.9):
+        self.affiliations = [AffiliationRecord(
+            aff_string) for aff_string in affiliation_strings]
 
-        to_predict = df[df['institution_id'] == 0.0].drop_duplicates(
-            subset=['affiliation_string']).copy()
-        to_predict['institution_id'] = to_predict['institution_id'].astype(
-            'int')
+        for record in self.affiliations:
+            record.lang = self._get_language(record.affiliation_string)
+            record.country_in_string = self._get_country_in_string(
+                record.affiliation_string)
+            record.comma_split_len = len(
+                [i for i in record.affiliation_string.split(",") if i])
+            record.institution_id = self._get_initial_pred(
+                record.affiliation_string, record.lang, record.country_in_string, record.comma_split_len
+            )
 
-        to_predict['decoded_text'] = to_predict['affiliation_string'].apply(
-            unidecode)
+        to_predict = [
+            record for record in self.affiliations if record.institution_id == 0]
 
-        to_predict['lang_pred_score'] = self._get_language_model_prediction(
-            to_predict['decoded_text'].to_list(
-            ), to_predict['country_in_string'].to_list()
-        )
-        to_predict['basic_pred_score'] = self._get_basic_model_prediction(
-            to_predict['decoded_text'].to_list(
-            ), to_predict['country_in_string'].to_list()
-        )
+        for record in to_predict:
+            record.decoded_text = unidecode(record.affiliation_string)
+            record.lang_pred_score = self._get_language_model_prediction(
+                [record.decoded_text], [record.country_in_string]
+            )[0]
+            record.basic_pred_score = self._get_basic_model_prediction(
+                [record.decoded_text], [record.country_in_string]
+            )[0]
 
-        to_predict['institution_id'] = to_predict.apply(
-            lambda x: self._get_final_prediction(
-                x.basic_pred_score,
-                x.lang_pred_score,
-                x.country_in_string,
-                x.affiliation_string,
+            prediction = self._get_final_prediction(
+                record.basic_pred_score,
+                record.lang_pred_score,
+                record.country_in_string,
+                record.affiliation_string,
                 lang_thresh,
                 basic_thresh,
-            ),
-            axis=1,
-        )
+            )
 
-        to_predict['ror_id'] = to_predict['institution_id'].apply(
-            lambda x: [self._map_institution_to_ror(pred) for pred in x[0]]
-        )
+            record.institution_id, record.score, record.category = prediction
+            record.ror_id = [self._map_institution_to_ror(
+                pred) for pred in record.institution_id]
 
-        final_df = df[['affiliation_string']].merge(
-            to_predict[['affiliation_string', 'institution_id', 'ror_id']],
-            how='left',
-            on='affiliation_string'
-        )
-
-        pd.set_option('display.max_columns', None)
-
-        # Extract score and match type from institution_id
-        final_df['extracted_info'] = final_df['institution_id'].apply(
-            lambda x: x if isinstance(x, list) and len(
-                x) == 3 else [[], [], []]
-        )
-        final_df['institution_id'] = final_df['extracted_info'].apply(
-            lambda x: ';'.join(str(id) for id in x[0]) if x[0] else ''
-        )
-        final_df['score'] = final_df['extracted_info'].apply(
-            lambda x: ';'.join(str(score) for score in x[1]) if x[1] else ''
-        )
-        final_df['category'] = final_df['extracted_info'].apply(
-            lambda x: ';'.join(str(cat) for cat in x[2]) if x[2] else ''
-        )
-        final_df['ror_id'] = final_df['ror_id'].apply(
-            lambda x: ';'.join(str(ror)
-                               for ror in x) if isinstance(x, list) else ''
-        )
-        # Remove temp column
-        final_df = final_df.drop('extracted_info', axis=1)
-
-        return final_df
+        return self._format_results()
