@@ -24,7 +24,6 @@ def read_input_data(input_file):
             if 'affiliation_string' not in reader.fieldnames:
                 raise ValueError(
                     "The input file must contain an 'affiliation_string' column.")
-
             data = []
             null_count = 0
             for row in reader:
@@ -32,10 +31,8 @@ def read_input_data(input_file):
                     null_count += 1
                     row['affiliation_string'] = ''
                 data.append(row)
-
             if null_count > 0:
                 logger.warning(f"Found {null_count} empty values in affiliation column. Replaced with empty strings.")
-
             return data
     except FileNotFoundError:
         logger.error(f"Error: The file {input_file} was not found.")
@@ -49,36 +46,35 @@ def run_inference(data):
     tagger = InstitutionTagger(model_path="institution_tagger_v2_artifacts")
     affiliation_strings = [row['affiliation_string'] for row in data]
     predictions = tagger.predict(affiliation_strings)
-
     for row, prediction in zip(data, predictions):
         row['predicted_institution_id'] = prediction['institution_id']
         row['predicted_ror_id'] = prediction['ror_id']
         row['prediction_scores'] = prediction['score']
         row['prediction_categories'] = prediction['category']
-
     return data
 
 
-def clean_ror_id(value):
-    if value == 'None':
-        return ''
-    else:
-        return ';'.join(filter(lambda x: x != 'None', value.split(';')))
+def format_list(value):
+    return ';'.join(map(str, value)) if value else ''
 
 
 def write_output_data(data, output_file):
     try:
         columns_to_write = ['ror_id', 'affiliation_string', 'predicted_institution_id',
                             'predicted_ror_id', 'prediction_scores', 'prediction_categories']
-
-        with open(output_file, 'w',encoding='utf-8') as f_out:
+        with open(output_file, 'w', encoding='utf-8') as f_out:
             writer = csv.DictWriter(f_out, fieldnames=columns_to_write)
             writer.writeheader()
-
             for row in data:
-                row['predicted_ror_id'] = clean_ror_id(row['predicted_ror_id'])
-                writer.writerow({k: row[k] for k in columns_to_write})
-
+                formatted_row = {
+                    'ror_id': row.get('ror_id', ''),
+                    'affiliation_string': row['affiliation_string'],
+                    'predicted_institution_id': format_list(row['predicted_institution_id']),
+                    'predicted_ror_id': format_list(row['predicted_ror_id']),
+                    'prediction_scores': format_list(row['prediction_scores']),
+                    'prediction_categories': format_list(row['prediction_categories'])
+                }
+                writer.writerow(formatted_row)
         print(f"Predictions saved to {output_file}")
     except Exception as e:
         print(f"Error writing to the output file: {e}")

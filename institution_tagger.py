@@ -324,8 +324,6 @@ class InstitutionTagger:
         """
         Performs the model comparison and filtering to get the final prediction.
         """
-
-        # Getting the individual preds and scores for both models
         pred_lang, score_lang, mapped_lang = lang_pred_score
         pred_basic, score_basic, mapped_basic = basic_pred_score
 
@@ -438,8 +436,7 @@ class InstitutionTagger:
                 final_preds = final_preds_after_removal
                 final_scores = final_scores_after_removal
                 final_cats = final_cats_after_removal
-
-        # Check for multi-name institution problems (final check)
+                
         preds_to_remove = []
         if final_preds[0] == -1:
             pass
@@ -465,7 +462,6 @@ class InstitutionTagger:
                         pass
 
             if any(x in final_preds for x in self.multi_inst_names_ids):
-                # Go through logic
                 if len(final_preds) == 1:
                     pred_name = str(
                         self.full_affiliation_dict[final_preds[0]]['display_name'])
@@ -476,12 +472,12 @@ class InstitutionTagger:
                     ):
                         final_preds = [-1]
                         final_scores = [0.0]
-                        final_cats = ['nothing']
+                        final_cats = ['']
                     elif pred_name.startswith("Department of"):
                         if ("College" in raw_sentence) or ("University" in raw_sentence):
                             final_preds = [-1]
                             final_scores = [0.0]
-                            final_cats = ['nothing']
+                            final_cats = ['']
                         elif (
                             self._string_match_clean(
                                 str(
@@ -491,7 +487,7 @@ class InstitutionTagger:
                         ):
                             final_preds = [-1]
                             final_scores = [0.0]
-                            final_cats = ['nothing']
+                            final_cats = ['']
 
                 else:
                     non_multi_inst_name_preds = [
@@ -543,18 +539,29 @@ class InstitutionTagger:
         if not true_final_preds:
             true_final_preds = [-1]
             true_final_scores = [0.0]
-            true_final_cats = ['nothing']
+            true_final_cats = ['']
         return [true_final_preds, true_final_scores, true_final_cats]
 
-    def _format_results(self):
+    def _prepare_results(self):
         results = []
         for record in self.affiliations:
+            # Filter out null predictions (-1 and resulting None values) returned from the model
+            def filter_valid(lst):
+                return [item for item in lst if item not in (-1, None)]
+            valid_institution_ids = filter_valid(record.institution_id) if isinstance(
+                record.institution_id, list) else []
+            valid_ror_ids = filter_valid(record.ror_id) if isinstance(
+                record.ror_id, list) else []
+            valid_scores = record.score[:len(valid_institution_ids)] if isinstance(
+                record.score, list) else []
+            valid_categories = record.category[:len(valid_institution_ids)] if isinstance(
+                record.category, list) else []
             result = {
                 'affiliation_string': record.affiliation_string,
-                'institution_id': ';'.join(str(id) for id in record.institution_id) if record.institution_id else '',
-                'score': ';'.join(str(score) for score in record.score) if record.score else '',
-                'category': ';'.join(str(cat) for cat in record.category) if record.category else '',
-                'ror_id': ';'.join(str(ror) for ror in record.ror_id) if record.ror_id else ''
+                'institution_id': valid_institution_ids,
+                'score': valid_scores,
+                'category': valid_categories,
+                'ror_id': valid_ror_ids
             }
             results.append(result)
         return results
@@ -598,4 +605,4 @@ class InstitutionTagger:
             record.ror_id = [self._map_institution_to_ror(
                 pred) for pred in record.institution_id]
 
-        return self._format_results()
+        return self._prepare_results()
