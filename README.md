@@ -32,7 +32,7 @@ python openalex_ror_predictor.py -i <input_file.csv> -o <output_file.csv>
 The input CSV file should contain an 'affiliation_string' column with the affiliation strings to be processed.
 
 ### Python Usage
-To use the `InstitutionTagger` class in your Python code:
+To use the `InstitutionTagger` class in your code:
 
 ```python
 from institution_tagger import InstitutionTagger
@@ -40,14 +40,35 @@ from institution_tagger import InstitutionTagger
 tagger = InstitutionTagger(model_path="institution_tagger_v2_artifacts")
 affiliation_strings = ['University of Michigan, Ann Arbor, USA', 'Getty Conservation Institute, Los Angeles']
 predictions = tagger.predict(affiliation_strings)
-
 ```
 
 ## Output
-The predictor returns the following for each affiliation string:
-- OpenAlex institution ID(s)
-- ROR ID(s) (where available)
-- Prediction score(s)
-- Prediction category(ies)
+The predictor returns a list of dictionaries, where each dictionary corresponds to an input affiliation string and contains the following keys:
 
-Multiple predictions may be returned for a single affiliation string, separated by semicolons.
+- `affiliation_string`: The original input affiliation string.
+- `institution_id`: A list of predicted OpenAlex institution IDs.
+- `ror_id`: A list of corresponding ROR IDs (where available).
+- `score`: A list of prediction scores corresponding to each institution ID.
+- `category`: A list of prediction categories corresponding to each institution ID.
+
+Example output:
+
+```python
+[
+    {
+        'affiliation_string': 'University of Michigan, Ann Arbor, USA; Getty Conservation Institute, Los Angeles',
+        'institution_id': [27837315, 200193707],
+        'ror_id': ['https://ror.org/00jmfr291', 'https://ror.org/019496w77'],
+        'score': [0.95, 0.85],
+        'category': ['model_match', 'string_match']
+    },
+    {
+        'affiliation_string': 'Getty Conservation Institute, Los Angeles',
+        'institution_id': [200193707],
+        'ror_id': ['https://ror.org/019496w77'],
+        'score': [0.90],
+        'category': ['basic_thresh']
+    }
+]
+```
+
