@@ -16,8 +16,7 @@ def load_results_set(f):
         for row in reader:
             processed_row = {
                 'ror_id': process_ror_ids(row['ror_id']),
-                'predicted_ror_ids': process_ror_ids(row['predicted_ror_id']),
-                'prediction_scores': [float(score) for score in row['prediction_scores'].split(';') if score.strip()]
+                'predicted_ror_ids': process_ror_ids(row['predicted_ror_id'])
             }
             processed_row['confusion_matrix'] = calculate_confusion_matrix(
                 processed_row)
